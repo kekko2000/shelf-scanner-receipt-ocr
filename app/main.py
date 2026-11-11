@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import secrets
 from functools import lru_cache
@@ -9,17 +10,30 @@ from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from paddleocr import PaddleOCR
 from PIL import Image
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("shelf-scan-receipt")
+
 app = FastAPI(title="Shelf Receipt OCR", version="1.0.0")
 DETECTOR_API_KEY = os.getenv("AISERVER_API_KEY", "").strip()
 
 @lru_cache(maxsize=2)
 def get_receipt_ocr(language: str) -> PaddleOCR:
-    return PaddleOCR(
+    logger.info("PaddleOCR init start language=%s", language)
+    ocr = PaddleOCR(
         lang="en" if language == "en" else "it",
         use_doc_orientation_classify=False,
         use_doc_unwarping=False,
         use_textline_orientation=False,
     )
+    logger.info("PaddleOCR init complete language=%s", language)
+    return ocr
+
+@app.on_event("startup")
+def preload_receipt_ocr() -> None:
+    """Load the default Italian OCR model before accepting requests."""
+    logger.info("PaddleOCR preload start language=it")
+    get_receipt_ocr("it")
+    logger.info("PaddleOCR preload complete language=it")
 
 def require_api_key(authorization: str | None) -> None:
     if not DETECTOR_API_KEY:
@@ -66,8 +80,11 @@ async def ocr_receipt(
     temp_path = validate_image(await file.read(), file.filename or "receipt.jpg")
     selected_language = "en" if language.lower().startswith("en") else "it"
     try:
+        logger.info("OCR request start language=%s filename=%s", selected_language, file.filename)
         rows: list[dict] = []
-        for result in get_receipt_ocr(selected_language).predict(temp_path):
+        ocr = get_receipt_ocr(selected_language)
+        logger.info("OCR predict start language=%s", selected_language)
+        for result in ocr.predict(temp_path):
             payload = getattr(result, "json", result)
             if callable(payload):
                 payload = payload()
@@ -90,8 +107,10 @@ async def ocr_receipt(
                     "box": [int(round(float(point))) for point in box] if box else [],
                 })
         rows.sort(key=lambda row: (row["box"][1] if len(row["box"]) > 1 else 0, row["box"][0] if row["box"] else 0))
+        logger.info("OCR request complete language=%s lines=%s", selected_language, len(rows))
         return {"language": selected_language, "lines": rows, "mode": "receipt-ocr"}
     except Exception as exc:
+        logger.exception("OCR request failed language=%s", selected_language)
         raise HTTPException(status_code=422, detail=f"Impossibile leggere lo scontrino: {exc}") from exc
     finally:
         try:
