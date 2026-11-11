@@ -50,6 +50,10 @@ def validate_image(data: bytes, filename: str) -> str:
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "shelf-scan-receipt"}
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"status": "ok", "service": "shelf-scan-receipt"}
+
 @app.post("/receipt")
 async def ocr_receipt(
     file: UploadFile = File(...),
