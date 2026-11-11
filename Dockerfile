@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
@@ -11,7 +11,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install the CPU wheel from Paddle's official index before the legacy OCR
+# package. This keeps the PaddleOCR 2.x stack separate from modern releases.
+RUN python -m pip install --no-cache-dir \
+    paddlepaddle==2.6.2 \
+    -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+RUN python -m pip install --no-cache-dir -r requirements.txt
 
 # Download and validate the Italian OCR models while building the image.
 # Runtime startup then only initializes the already-cached models, avoiding
