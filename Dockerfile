@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Download and validate the Italian OCR models while building the image.
 # Runtime startup then only initializes the already-cached models, avoiding
 # a first-request download and the associated 502 risk.
-RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(lang='it', use_doc_orientation_classify=False, use_doc_unwarping=False, use_textline_orientation=False)"
+RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(lang='it', use_angle_cls=False)"
 
 COPY app ./app
 

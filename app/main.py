@@ -18,14 +18,12 @@ DETECTOR_API_KEY = os.getenv("AISERVER_API_KEY", "").strip()
 
 @lru_cache(maxsize=1)
 def get_receipt_ocr() -> PaddleOCR:
-    # PaddleOCR 3.3.0 exposes the Italian model as `it`; it also recognizes
-    # Latin-script English receipt text and numeric prices.
+    # PaddleOCR 2.7.3 supports the Italian multilingual model and runs on the
+    # older CPU available on the home ThinkCentre server.
     logger.info("PaddleOCR init start model=it")
     ocr = PaddleOCR(
         lang="it",
-        use_doc_orientation_classify=False,
-        use_doc_unwarping=False,
-        use_textline_orientation=False,
+        use_angle_cls=False,
     )
     logger.info("PaddleOCR init complete model=it")
     return ocr
@@ -86,27 +84,23 @@ async def ocr_receipt(
         rows: list[dict] = []
         ocr = get_receipt_ocr()
         logger.info("OCR predict start language=%s", selected_language)
-        for result in ocr.predict(temp_path):
-            payload = getattr(result, "json", result)
-            if callable(payload):
-                payload = payload()
-            if isinstance(payload, str):
-                payload = json.loads(payload)
-            if not isinstance(payload, dict):
-                continue
-            texts = payload.get("rec_texts") or []
-            scores = payload.get("rec_scores") or []
-            boxes = payload.get("rec_boxes") or []
-            for index, text in enumerate(texts):
-                value = str(text).strip()
+        results = ocr.ocr(temp_path, cls=False) or []
+        for page in results:
+            for line in page or []:
+                if not isinstance(line, (list, tuple)) or len(line) < 2:
+                    continue
+                box, recognition = line[0], line[1]
+                if not isinstance(recognition, (list, tuple)) or not recognition:
+                    continue
+                value = str(recognition[0]).strip()
                 if not value:
                     continue
-                score = float(scores[index]) if index < len(scores) else 0.0
-                box = boxes[index] if index < len(boxes) else []
+                score = float(recognition[1]) if len(recognition) > 1 else 0.0
+                flat_box = [coordinate for point in (box or []) for coordinate in point]
                 rows.append({
                     "text": value,
                     "confidence": round(score, 3),
-                    "box": [int(round(float(point))) for point in box] if box else [],
+                    "box": [int(round(float(point))) for point in flat_box],
                 })
         rows.sort(key=lambda row: (row["box"][1] if len(row["box"]) > 1 else 0, row["box"][0] if row["box"] else 0))
         logger.info("OCR request complete language=%s lines=%s", selected_language, len(rows))
