@@ -30,13 +30,6 @@ def get_receipt_ocr() -> PaddleOCR:
     logger.info("PaddleOCR init complete model=it")
     return ocr
 
-@app.on_event("startup")
-def preload_receipt_ocr() -> None:
-    """Load the default Italian OCR model before accepting requests."""
-    logger.info("PaddleOCR preload start model=it")
-    get_receipt_ocr()
-    logger.info("PaddleOCR preload complete model=it")
-
 def require_api_key(authorization: str | None) -> None:
     if not DETECTOR_API_KEY:
         raise HTTPException(status_code=503, detail="API key non configurata.")
