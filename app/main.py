@@ -18,23 +18,24 @@ DETECTOR_API_KEY = os.getenv("AISERVER_API_KEY", "").strip()
 
 @lru_cache(maxsize=1)
 def get_receipt_ocr() -> PaddleOCR:
-    # One PP-OCRv5 Latin model covers both Italian and English receipts.
-    logger.info("PaddleOCR init start model=latin")
+    # PaddleOCR 3.3.0 exposes the Italian model as `it`; it also recognizes
+    # Latin-script English receipt text and numeric prices.
+    logger.info("PaddleOCR init start model=it")
     ocr = PaddleOCR(
-        lang="latin",
+        lang="it",
         use_doc_orientation_classify=False,
         use_doc_unwarping=False,
         use_textline_orientation=False,
     )
-    logger.info("PaddleOCR init complete model=latin")
+    logger.info("PaddleOCR init complete model=it")
     return ocr
 
 @app.on_event("startup")
 def preload_receipt_ocr() -> None:
     """Load the default Italian OCR model before accepting requests."""
-    logger.info("PaddleOCR preload start model=latin")
+    logger.info("PaddleOCR preload start model=it")
     get_receipt_ocr()
-    logger.info("PaddleOCR preload complete model=latin")
+    logger.info("PaddleOCR preload complete model=it")
 
 def require_api_key(authorization: str | None) -> None:
     if not DETECTOR_API_KEY:
