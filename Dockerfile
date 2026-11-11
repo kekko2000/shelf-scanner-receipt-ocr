@@ -4,7 +4,7 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 DISABLE_MODEL_SOURCE_CHECK=True
 # OpenCV needs these runtime libraries on the slim Debian image.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 libxcb1 libgomp1 curl wget \
+    && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 libxcb1 libgomp1 libstdc++6 libgcc-s1 libatomic1 curl wget \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
